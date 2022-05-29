@@ -1,0 +1,245 @@
+---
+title: "Completing a randomization tests: gender discrimination"
+output: html_notebook
+---
+
+
+
+```{r}
+# Load packages
+library(ggplot2)
+library(tidyverse)
+library(infer)
+
+# Load datasets
+disc_big = readRDS("./datasets/disc_big.rds")
+disc_small = readRDS("./datasets/disc_small.rds")
+disc_new = readRDS("./datasets/disc_new.rds")
+
+disc <- data.frame(promote = c(rep("promoted", 35),
+                               rep("not_promoted", 13)),
+                   sex = c(rep("male", 21), rep("female", 14),
+                           rep("male", 3), rep("female", 10)))
+```
+
+
+# Example: gender discrimination
+
+
+## Gender discrimination hypotheses
+
+$H_0:$  gender and promotion are unrelated variables.
+$H_A:$: men are more likely to be promoted.
+
+
+```{r}
+disc
+```
+
+```{r}
+summary(disc)
+```
+
+
+## Summarizing gender discrimination
+
+```{r}
+# Create a contingency table summarizing the data
+disc %>%
+  # Count the rows by sex, promote
+  count(sex, promote)
+
+# Find proportion of each sex who were promoted
+disc %>%
+  # Group by sex
+  group_by(sex) %>%
+  # Calculate proportion promoted summary stat
+  summarize(promoted_prop = mean(promote == "promoted"))
+```
+Difference in promotions is almost 0.3
+
+
+
+## Step-by-step through the permutation
+
+```{r}
+# Replicate the entire data frame, permuting the promote variable
+disc_perm <- disc %>%
+  specify(promote ~ sex, success = "promoted") %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 5, type = "permute")
+disc_perm
+```
+
+
+```{r}
+disc_perm %>%
+  # Group by replicate
+  group_by(replicate) %>%
+  # Count per group
+  count()
+```
+
+
+```{r}
+disc_perm %>%
+  # Calculate difference in proportion, male then female
+  calculate(stat = "diff in props", order = c("male", "female"))
+```
+
+
+## Randomizing gender discrimination
+
+Recall that we are considering a situation where the number of men and women are fixed (representing the resumes) and the number of people promoted is fixed (the managers were able to promote only 35 individuals).
+
+In this exercise, you'll create a randomization distribution of the null statistic with 1000 replicates as opposed to just 5 in the previous exercise. As a reminder, the statistic of interest is the difference in proportions promoted between genders (i.e. proportion for males minus proportion for females). From the original dataset, you can calculate how the promotion rates differ between males and females. Using the specify-hypothesis-generate-calculate workflow in infer, you can calculate the same statistic, but instead of getting a single number, you get a whole distribution. In this exercise, you'll compare that single number from the original dataset to the distribution made by the simulation.
+
+```{r}
+# Calculate the observed difference in promotion rate
+diff_orig <- disc %>%
+  group_by(sex) %>%
+  summarize(prop_prom = mean(promote == "promoted")) %>%
+  summarize(stat = diff(prop_prom)) %>% 
+  pull()
+  
+diff_orig
+```
+
+
+```{r}
+disc_perm <- disc %>%
+  specify(promote ~ sex, success = "promoted") %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 1000, type = "permute") %>% 
+  calculate(stat = "diff in props", order = c("male", "female"))
+
+disc_perm
+```
+
+
+```{r}
+# From previous steps
+diff_orig <- disc %>%
+  group_by(sex) %>%
+  summarize(prop_prom = mean(promote == "promoted")) %>%
+  summarize(stat = diff(prop_prom)) %>% 
+  pull()
+
+disc_perm <- disc %>%
+  specify(promote ~ sex, success = "promoted") %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "diff in props", order = c("male", "female"))
+  
+ggplot(disc_perm, aes(x = stat)) + 
+  geom_histogram(binwidth = 0.01) +
+  geom_vline(aes(xintercept = diff_orig), color = "red") +
+  ggtitle("Randomization distribution of null distribution")
+```
+
+In the population there is evidence that women are promoted at a different rate, but we cannot tell whether the difference is due to discrimination or something else.
+
+# Distribution of statistics
+
+It seems as though the statistic—a difference in promotion rates of 0.2917—is on the extreme end of the permutation distribution. That is, there are very few permuted differences which are as extreme as the observed difference.
+
+To quantify the extreme permuted (null) differences, we use the quantile() function.
+
+```{r}
+disc_perm %>% 
+  summarize(
+    q.90 = quantile(stat, p = 0.9),
+    q.95 = quantile(stat, p = 0.95),
+    q.99 = quantile(stat, p = 0.99)
+  ) -> disc_perm_quantiles
+
+disc_perm_quantiles
+```
+
+## Critical Region (One Sided)
+
+```{r}
+ggplot(disc_perm, aes(x = stat)) + 
+  geom_histogram(binwidth = 0.01) +
+  
+  geom_vline(aes(xintercept = diff_orig), color = "red", size = 2) +
+  
+  geom_vline(aes(xintercept = disc_perm_quantiles$q.90, color = "Q90")) +
+  geom_vline(aes(xintercept = disc_perm_quantiles$q.95, color = "Q95")) +
+  geom_vline(aes(xintercept = disc_perm_quantiles$q.99, color = "Q99")) +
+  
+  ggtitle("Randomization distribution of null distribution")
+```
+## Two-sided critical region
+For the discrimination data, the question at hand is whether or not women were promoted less often than men. However, there are often scenarios where the research question centers around a difference without directionality.
+
+For example, you might be interested in whether the rate of promotion for men and women is different. In that case, a difference in proportions of -0.29 is just as "extreme" as a difference of positive 0.29.
+
+If you had seen that women were promoted more often, what would the other side of the distribution of permuted differences look like? That is, what are the smallest (negative) values of the distribution of permuted differences?
+
+
+```{r}
+# Use disc_perm
+disc_perm %>% 
+  summarize(
+    q.01 = quantile(stat, p = 0.01),
+    q.05 = quantile(stat, p = 0.05),
+    q.10 = quantile(stat, p = 0.1)
+  )
+```
+Now you've seen both the upper and lower values of the permuted statistics. The information will help you know whether the value calculated from the data (the observed statistic) is large or small.
+
+
+# Why 0.05
+
+## How does sample size affect results
+
+Notice that the observed difference of 0.2917 is in the extreme right tail of the permuted differences. If the sample was ten times larger but the sample statistic was exactly the same (i.e. 0.2917), how would the distribution of permuted differences change? Complete the following sentence.
+
+- Be much farther to the right of the permuted differences (completely off of the distribution), because the statistic would be much farther to the right of the permuted differences, as you'll see in the next exercise.
+
+
+## Sample size in randomization distribution
+
+We've created two new datasets for you with essentially the same difference in proportions as the original discrimination data. However, one of the datasets (disc_small) is one third the size of the original dataset and the other (disc_big) is 10 times larger than the original dataset.
+
+Additionally, the same permutation code used previously has been run on the small and big datasets to create small and big distributions of permuted differences in promotion rates (disc_small_perm and disc_big_perm, respectively).
+
+In this exercise, you'll use these two new distributions to get a sense for how the differences vary given widely different sample sizes. In particular, notice the range of variability on the x-axis of each plot.
+
+```{r}
+disc_small %>% 
+  count(sex, promote)
+  
+disc_big %>% 
+  count(sex, promote)
+```
+
+
+
+
+
+
+# What is a p-value?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Summary of gender discrimination

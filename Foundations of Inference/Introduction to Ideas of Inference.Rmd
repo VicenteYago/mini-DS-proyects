@@ -8,6 +8,9 @@ output: html_notebook
 library(ggplot2)
 library(tidyverse)
 library(infer)
+
+# Load datasets
+library(NHANES) # install.packages("NHANES")
 ```
 
 
@@ -35,10 +38,7 @@ We can build a distribution of differences in proportions assuming the null hypo
 
 # Working with the NHANES data
 
-
 ```{r}
-library(NHANES)
-# What are the variables in the NHANES dataset?
 colnames(NHANES)
 ```
 
@@ -48,7 +48,8 @@ colnames(NHANES)
 ggplot(NHANES, aes(x = Gender, fill = HomeOwn)) + 
   # Set the position to fill
   geom_bar(position = "fill") +
-  ylab("Relative frequencies")
+  ylab("Relative frequencies") +
+  ggtitle("Home ownership by gender")
 ```
 
 
@@ -147,10 +148,41 @@ diff_orig = -0.0078
 # Plot permuted differences, diff_perm
 ggplot(homeown_perm, aes(x = stat)) +
   geom_density() +
-  geom_vline(aes(xintercept = diff_orig), color = "red")
+  geom_vline(aes(xintercept = diff_orig), color = "red") + 
+  ggtitle("Randomization Distribution density + observed sample" )
 
-homeown_perm %>%
-  summarize(n_perm_le_obs = sum(diff_perm <= diff_orig))
 ```
+
+```{r}
+homeown_perm %>%
+  summarize(n_perm_le_obs = sum(diff_perm <= diff_orig)) #212
+```
+
+212 permuted differences are more extreme than the observed difference. This only represents 21.2% of the null statistics, so you can conclude that the observed difference is consistent with the permuted distribution.
+
+In other words: **We fail to reject the null hypothesis** -> There is no evidence that our dat are inconsistent with the null hypothesis.
+
+
+This code throws and error because the homeown_perm from datacamp is modified without further explanations: 
+```{r}
+# A tibble: 1,000 x 3
+#   replicate diff_perm diff_orig
+#       <int>     <dbl>     <dbl>
+# 1         1  -0.00289  -0.00783
+# 2         2  -0.00289  -0.00783
+# 3         3   0.00659  -0.00783
+# 4         4   0.00412  -0.00783
+# 5         5   0.00494  -0.00783
+# 6         6   0.00453  -0.00783
+# 7         7  -0.0111   -0.00783
+# 8         8  -0.0185   -0.00783
+# 9         9  -0.00206  -0.00783
+#10        10  -0.0115   -0.00783
+# ... with 990 more rows
+```
+
+Its possible to be calculated with the calculate(stat = "diff in props", ...)
+
+
 
 
