@@ -1,0 +1,239 @@
+---
+title: "Bootstraping for estimating a parameter"
+output: html_notebook
+---
+
+
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(infer)     # bootstrap
+library(openintro) # ncbirths datasets
+```
+
+## Review percentile and standard error methods
+
+### Generate a bootstrap distribution for median
+```{r}
+manhattan = read.csv('./datasets/manhattan.csv')
+manhattan
+```
+
+```{r}
+ggplot(manhattan, aes(x =  rent)) +
+  # Make it a histogram with a binwidth of 50
+  geom_histogram(binwidth = 50) + 
+  ggtitle("Original sample distribution")
+```
+
+```{r}
+# Generate bootstrap distribution of medians
+rent_med_ci <- manhattan %>%
+  # Specify the variable of interest
+  specify (response = rent) %>%  
+  # Generate 15000 bootstrap samples
+  generate(reps = 15000, type = "bootstrap") %>% 
+  # Calculate the median of each bootstrap sample
+  calculate(stat = "median")
+
+# View its structure
+str(rent_med_ci)
+```
+
+```{r}
+rent_med_ci
+```
+
+
+```{r}
+# Plot the rent_med_ci statistic
+ggplot(rent_med_ci, aes(x =  stat)) +
+  # Make it a histogram with a binwidth of 50
+  geom_histogram(binwidth = 50) + 
+  ggtitle("Bootstraped sample distribution")
+```
+Each observation is a median from a bootstrap sample, and each bootstrap sample is a sample taken **with replacement** from the original sample.
+
+
+### Calculate bootstrap interval usign both methods
+
+
+```{r}
+# From previous step
+rent_med_obs <- manhattan %>%
+  summarize(median_rent = median(rent)) %>%
+  pull()
+
+# Calculate the degrees of freedom
+degrees_of_freedom <- nrow(manhattan) - 1  
+
+# Determine the critical value
+t_star <- qt(0.975, df = degrees_of_freedom)
+```
+
+
+```{r}
+rent_med_obs
+degrees_of_freedom
+t_star
+```
+
+Method 1 : Using the percentile method
+
+Calculate a 95% bootstrap confidence interval using the percentile method:
+
+```{r}
+# Calculate bootstrap CI as lower and upper quantiles
+rent_med_ci %>%
+  summarize(
+    l = quantile(stat, 0.025),
+    u = quantile(stat, 0.975)
+  ) 
+```
+Method 2 : Using std error method
+
+```{r}
+# Calculate the CI using the std error method
+rent_med_ci %>%
+  # Calculate the std error of the statistic
+  summarize(boot_se = sd(stat)) %>%
+  # Calculate the lower and upper limits of the CI
+  summarize(
+    l = rent_med_obs - t_star * boot_se,
+    u = rent_med_obs + t_star * boot_se
+  )
+```
+
+### Doctor visits during pregnancy 
+
+The state of North Carolina released to the public a large data set containing information on births recorded in this state. This data set has been of interest to medical researchers who are studying the relation between habits and practices of expectant mothers and the birth of their children. The ncbirths dataset (which is already loaded for you) is a random sample of 1000 cases from this data set. Among other variables, the number of doctor's visits (visits) the mother had throughout the pregnancy is recorded. Which of the following is false about the distribution of visits?
+
+```{r}
+ncbirths
+```
+
+"On average, mothers visit the doctor approximately 12 times throughout pregnancy." -> TRUE
+
+```{r}
+summary(ncbirths)
+```
+
+"The distribution of number of doctor's visits is unimodal and roughly symmetric." -> TRUE
+```{r}
+ggplot(ncbirths, aes(x =  visits)) +
+  geom_histogram(binwidth = 1) + 
+  ggtitle("Visits sample distribution")
+```
+
+
+"The median number of doctor's visits throughout the pregnancy is roughly equal to the mean number of visits." -> TRUE
+
+
+"The number of doctor's visits for one of the mothers in the dataset is missing." -> FALSE
+
+```{r}
+sum(is.na(ncbirths["visits"]))
+```
+At least from **9 mothers**, there are no records of visits.
+
+
+### Average number of doctors visits
+
+Next, we construct a bootstrap interval for the average number of doctor's visits during pregnancy.
+
+```{r}
+# Filter for rows with non-missing visits
+ncbirths_complete_visits <- ncbirths %>%
+  filter(!is.na(visits))
+  
+# See the result
+glimpse(ncbirths_complete_visits)
+```
+```{r}
+# Generate 15000 bootstrap means
+visit_mean_ci <- ncbirths_complete_visits %>%
+  # Specify visits as the response
+  specify(response = visits) %>%
+  # Generate 15000 bootstrap replicates
+  generate(reps = 15000, type = "bootstrap") %>%
+  # Calculate the mean
+  calculate(stat = "mean")
+
+head(visit_mean_ci)
+```
+
+
+```{r}
+# Calculate the 90% CI via percentile method
+visit_mean_ci %>%
+  summarize(
+    l = quantile(stat, 0.05),
+    u = quantile(stat, 0.95)
+  ) 
+```
+
+### SD of number of doctor's visits
+
+```{r}
+# Calculate 15000 bootstrap standard deviations of visits
+visit_sd_ci <- ncbirths_complete_visits %>%
+  specify(response = visits) %>%
+  # Generate 15000 bootstrap replicates
+  generate(reps = 15000, type = "bootstrap") %>%
+  # Calculate the mean
+  calculate(stat = "sd")
+  
+# See the result
+visit_sd_ci
+```
+
+
+```{r}
+# Calculate the 90% CI via percentile method
+visit_sd_ci %>%
+  summarize(
+    l = quantile(stat, 0.05),
+    u = quantile(stat, 0.95)
+  )
+```
+
+
+## Re-centering a bootstrap distribution
+* Bootstrap dists. are by design centered at the observed sample statistic. 
+* However since in a hypothesis test we assume that $H_0$ is true, we shift the bootstrap dist. to be centered at the null value.
+*p-value = The proportion of simulations that yield a sample statistic at least as favorable to the alternative hypothesis as the observed sample statistic.
+
+
+Let's turn our attention back to Manhattan apartments. We would like to evaluate whether this data provides evidence that the median rent of 1 BR apartments in Manhattan is greater than $2,500.
+
+Obviously the hipothesis is false since we know is 2350.
+
+```{r}
+# From previous step
+n_replicates <- 15000
+rent_med_ht <- manhattan %>%
+  specify(response = rent) %>%
+  hypothesize(null = "point", med = 2500) %>% 
+  generate(reps = n_replicates, type = "bootstrap") %>% 
+  calculate(stat = "median")
+rent_med_ht
+```
+
+```{r}
+rent_med_obs <- manhattan %>%
+  summarize(median_rent = median(rent)) %>%
+  pull()
+rent_med_obs
+```
+
+```{r}
+rent_med_ht %>%
+  # Filter for bootstrap stat greater than or equal to observed stat
+  filter(stat >= rent_med_obs) %>%
+  # Calculate the p-value
+  summarize(p_val = n() / n_replicates)
+```
+We fail to reject $H_0$ since the p-value is above the significance level, and conclude that the data do not provide convincing evidence that median rent of 1 BR apartments in Manhattan is greater than $2500.
+
+
