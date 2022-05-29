@@ -1,0 +1,156 @@
+---
+title: "Introduction to ideas of Inference"
+output: html_notebook
+---
+
+```{r}
+# Load packages
+library(ggplot2)
+library(tidyverse)
+library(infer)
+```
+
+
+- Hypotheses (1)
+Suppose a pharmaceutical company is trying to get FDA approval for a new diabetes treatment called drug A. Currently, most doctors prescribe drug B to treat diabetes.
+
+Which would be a good null hypothesis for the FDA statistician examining the drug company's data?:
+-Drug A is better than drug B at treating diabetes.
+
+
+- Hypotheses (2)
+Consider the same situation as in the last exercise. A pharmaceutical company is trying to pass drug A for diabetes through the FDA, but most doctors currently prescribe drug B.
+
+Which would be a good alternative hypothesis?:
+- Drug A is better than drug B at treating diabetes.
+
+
+# Randomized distributions
+
+We can build a distribution of differences in proportions assuming the null hypothesis, that there is no link between location and soda preference, is true. That is, the null samples consist of randomly shuffled soda variables so that the samples don't have any dependency between location and soda preference.
+
+ -> Generating a distribution of the statistics from the null population gives information about whether the observed data are inconsistent with the null hypothesis.
+
+
+
+# Working with the NHANES data
+
+
+```{r}
+library(NHANES)
+# What are the variables in the NHANES dataset?
+colnames(NHANES)
+```
+
+
+```{r}
+# Create bar plot for Home Ownership by Gender
+ggplot(NHANES, aes(x = Gender, fill = HomeOwn)) + 
+  # Set the position to fill
+  geom_bar(position = "fill") +
+  ylab("Relative frequencies")
+```
+
+
+```{r}
+ggplot(NHANES, aes(x = SleepHrsNight, color = SleepTrouble)) + 
+  geom_density(adjust = 2) + 
+  facet_wrap(~ HealthGen)
+```
+
+## Caculating statistic of interest
+
+As seen in the video, natural variability can be modeled from shuffling observations around to remove any relationships that might exist in the population. However, before you permute the data, you need to calculate the original observed statistic. In this exercise, you will calculate the difference in proportion of home owners who are men versus women.
+
+```{r}
+homes <- NHANES %>%
+  select(Gender, HomeOwn) %>%
+  filter(HomeOwn %in% c("Own", "Rent"))
+homes
+```
+
+Calculating difference in ownership between genders.
+```{r}
+diff_orig <- homes %>%   
+  group_by(Gender) %>%
+  summarize(prop_own = mean(HomeOwn == "Own")) %>%
+  summarize(obs_diff_prop = diff(prop_own)) # male - female
+  
+diff_orig
+```
+
+
+## Randomized data under the null model of independence
+
+The infer package will allow you to model a particular null hypothesis and then randomize the data to calculate permuted statistics. In this exercise, after specifying your null hypothesis you will permute the home ownership variable 10 times. By doing so, you will ensure that there is no relationship between home ownership and gender, so any difference in home ownership proportion for female versus male will be due only to natural variability.
+
+```{r}
+homeown_perm <- homes %>%
+  specify(HomeOwn ~ Gender, success = "Own") %>%
+  hypothesize(null = "independence") %>% 
+  generate(reps = 10, type = "permute") 
+
+homeown_perm
+```
+
+## Randomized statistics and dotplot
+By permuting the home ownership variable multiple times, you generate differences in proportions that are consistent with the assumption that the variables are unrelated. The statistic of interest is the difference in proportions given by stat = "diff in props". After calculating the randomized statistics, you will plot them in a dotplot.
+
+```{r}
+# Perform 100 permutations
+homeown_perm <- homes %>%
+  specify(HomeOwn ~ Gender, success = "Own") %>%
+  hypothesize(null = "independence") %>% 
+  generate(reps = 100, type = "permute") %>% 
+  calculate(stat = "diff in props", order = c("male", "female"))
+homeown_perm
+```
+
+```{r}
+# Dotplot of 100 permuted differences in proportions
+ggplot(homeown_perm, aes(x = stat)) + 
+  geom_dotplot(binwidth = 0.001)
+```
+
+## Randomization density
+
+Using 100 repetitions allows you to understand the mechanism of permuting. However, 100 is not enough to observe the full range of likely values for the null differences in proportions. In this exercise, you'll repeat the process 1000 times to get a sense for the complete distribution of null differences in proportions.
+
+```{r}
+# Perform 1000 permutations
+  # Specify HomeOwn vs. Gender, with `"Own" as success
+homeown_perm <- homes %>%
+  specify(HomeOwn ~ Gender, success = "Own") %>%# Density plot of 1000 permuted differences in proportions
+
+  hypothesize(null = "independence") %>% 
+  generate(reps = 1000, type = "permute") %>% 
+  calculate(stat = "diff in props", order = c("male", "female"))
+
+# Density plot of 1000 permuted differences in proportions
+ggplot(homeown_perm, aes(x = stat)) + 
+  geom_density() + 
+  ggtitle("Randomization Distribution density")
+```
+
+# Using the randomization distribution 
+
+## Do the data come from the population ?
+
+```{r}
+homeown_perm
+```
+
+
+```{r}
+diff_orig = -0.0078
+
+# Plot permuted differences, diff_perm
+ggplot(homeown_perm, aes(x = stat)) +
+  geom_density() +
+  geom_vline(aes(xintercept = diff_orig), color = "red")
+
+homeown_perm %>%
+  summarize(n_perm_le_obs = sum(diff_perm <= diff_orig))
+```
+
+
