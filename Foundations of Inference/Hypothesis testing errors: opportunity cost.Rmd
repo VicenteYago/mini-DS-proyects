@@ -1,0 +1,20 @@
+---
+title: "Hypothesis testing errors: opportunity cost"
+output: html_notebook
+---
+
+# Example: opportunity cost
+
+
+
+
+
+
+# Errors and their consecuences
+
+
+
+
+
+
+# Summary of opportunity costs
