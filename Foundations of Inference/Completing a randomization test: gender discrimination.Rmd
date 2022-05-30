@@ -210,36 +210,232 @@ In this exercise, you'll use these two new distributions to get a sense for how 
 ```{r}
 disc_small %>% 
   count(sex, promote)
-  
+
 disc_big %>% 
   count(sex, promote)
+```
+```{r}
+#small
+disc_perm_small <- disc_small %>%
+  specify(promote ~ sex, success = "promoted") %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "diff in props", order = c("male", "female"))
+
+diff_orig_small <- disc_small %>%
+  group_by(sex) %>%
+  summarize(prop_prom = mean(promote == "promoted")) %>%
+  summarize(stat = diff(prop_prom)) %>% 
+  pull()
+
+#big
+disc_perm_big <- disc_big %>%
+  specify(promote ~ sex, success = "promoted") %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "diff in props", order = c("male", "female"))
+
+diff_orig_big <- disc_big %>%
+  group_by(sex) %>%
+  summarize(prop_prom = mean(promote == "promoted")) %>%
+  summarize(stat = diff(prop_prom)) %>% 
+  pull()
 ```
 
 
 
+```{r}
+# Using disc_perm_small, plot stat
+ggplot(disc_perm_small, aes(x = stat)) + 
+  # Add a histogram layer with binwidth 0.01
+  geom_histogram(binwidth = 0.01) +
+  # Add a vline layer, crossing x-axis at diff_orig_small
+  geom_vline(aes(xintercept = diff_orig_small), color = "red") + 
+  ggtitle("Randomization distribution of null distribution [small]")
+
+
+ggplot(disc_perm_big, aes(x = stat)) + 
+  # Add a histogram layer with binwidth 0.01
+  geom_histogram(binwidth = 0.01) +
+  # Add a vline layer, crossing x-axis at diff_orig_small
+  geom_vline(aes(xintercept = diff_orig_big), color = "red") + 
+  ggtitle("Randomization distribution of null distribution [big]")
+```
+
+
+The observed difference is consistent with differences you would see by chance if the sample size was small. The observed difference would virtually never be observed by chance if the sample size was big.
+
+## Sample size for critical region
+
+Using the randomization distributions with the small and big datasets, calculate different cutoffs for significance. Remember, you are most interested in a large positive difference in promotion rates, so you are calculating the upper quantiles of 0.90, 0.95, and 0.99.
+
+
+
+
+
+```{r}
+calc_upper_quantiles <- function(dataset) {
+  dataset %>% 
+    summarize(
+      q.90 = quantile(stat, p = 0.90),
+      q.95 = quantile(stat, p = 0.95),
+      q.99 = quantile(stat, p = 0.99)
+    )
+}
+# Recall the quantiles associated with the original dataset
+calc_upper_quantiles(disc_perm)
+
+# Calculate the quantiles associated with the small dataset
+calc_upper_quantiles(disc_perm_small)
+
+# Calculate the quantiles associated with the big dataset
+calc_upper_quantiles(disc_perm_big)
+```
+
+Notice how the differences in proportions must be much larger to be significant if the sample size is small. With a big sample size, a small difference in proportions can be significant.
 
 
 
 # What is a p-value?
 
+A p-value is the probability of observing data as or more extreme than what we actually got, given that the null hypothesis is true.
+
+
+## Calculating the p-value
+In the video, you learned that a p-value measures the degree of disagreement between the data and the null hypothesis. Here, you will calculate the p-value for the original discrimination dataset as well as the small and big versions, disc_small and disc_big.
+
+The original differences in proportions are available in your workspace, diff_orig, diff_orig_small, and diff_orig_big, as are the permuted datasets, disc_perm, disc_perm_small, and disc_perm_big.
+
+Recall that you're only interested in the one-sided hypothesis test here. That is, you're trying to answer the question, "Are men more likely to be promoted than women?"
+
+```{r}
+# Visualize and calculate the p-value for the original dataset
+disc_perm %>%
+  visualize(obs_stat = diff_orig, direction = "greater")
+
+disc_perm %>%
+  get_p_value(obs_stat = diff_orig, direction = "greater")
+```
+
+```{r}
+# Visualize and calculate the p-value for the small dataset
+disc_perm_small %>%
+  visualize(obs_stat = diff_orig_small, direction = "greater")
+
+disc_perm_small %>%
+  get_p_value(obs_stat = diff_orig_small, direction = "greater")
+```
+
+
+```{r}
+# Visualize and calculate the p-value for the big dataset
+disc_perm_big %>%
+  visualize(obs_stat = diff_orig_big, direction = "greater")
+
+disc_perm_big %>%
+  get_p_value(obs_stat = diff_orig_big, direction = "greater")
+```
+
+
+You may have noticed that the observed statistic is borderline significant (p-value = 0.03) for the original data. However, the same statistic would have been very consistent with the small dataset (p-value = 0.277 ) and extremely unusual for the large dataset (p-value = 0).
+
+
+## Practice calculating the p-value
+
+In the original dataset, 87.5% of the men were promoted and 58.3% of the women were promoted.
+
+Consider a situation where there are 24 men, 24 women, and 35 people are still promoted. But in this new scenario, 75% of the men are promoted and 70.8% of the women are promoted. Does the difference in promotion rates still appear to be statistically significant? That is, could this difference in promotion rates have come from random chance?
+
+You'll analyze these new data, contained in disc_new, using the same permutation algorithm from before.
+
+```{r}
+disc %>% 
+  count(sex, promote)
+
+disc_new %>% 
+  count(sex, promote)
+```
+
+```{r}
+disc_perm_new <- disc_new %>%
+  specify(promote ~ sex, success = "promoted") %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "diff in props", order = c("male", "female"))
+
+diff_orig_new <- disc_new %>%
+  group_by(sex) %>%
+  summarize(prop_prom = mean(promote == "promoted")) %>%
+  summarize(stat = diff(prop_prom)) %>% 
+  pull()
+```
+
+```{r}
+disc_perm_new
+
+diff_orig_new
+```
 
 
 
+```{r}
+# Recall the distribution of the original permuted differences
+ggplot(disc_perm, aes(x = stat)) + 
+  geom_histogram() +
+  geom_vline(aes(xintercept = diff_orig), color = "red") +
+  ggtitle("Randomization distribution of null distribution [dis_perm]")
 
 
+# Plot the distribution of the new permuted differences
+ggplot(disc_perm_new, aes(x = stat)) + 
+  geom_histogram() +
+  geom_vline(aes(xintercept = diff_orig_new), color = "red") +
+  ggtitle("Randomization distribution of null distribution [dis_perm_new]")
+
+```
 
 
+```{r}
+# Recall the p-value from the original data
+disc_perm %>%
+  summarize(p_value = mean(diff_orig <= stat))
+
+# Find the p-value from the new data
+disc_perm_new %>%
+  summarize(p_value = mean(stat >= diff_orig_new))
+```
+
+Notice that the permutation differences (the two histograms) are essentially the same regardless of whether the original or the new dataset is used.
 
 
+## Calculating two-sided p-values
 
+What if the original research hypothesis had focused on **any difference** in promotion rates between men and women instead of focusing on whether men are more likely to be promoted than women? In this case, a difference like the one observed would occur twice as often (by chance) because sometimes the difference would be positive and sometimes it would be negative.
 
+When there is no directionality to the alternative hypothesis, the hypothesis and p-value are considered to be two-sided. In a two-sided setting,**the p-value is double the one-sided p-value.**
 
+In this exercise, you'll calculate a two-sided p-value given the original randomization distribution and dataset.
 
+```{r}
+# Calculate the two-sided p-value
+disc_perm %>%
+  summarize(p_value = 2 * mean(diff_orig <= stat))
+```
 
-
-
-
-
-
+Notice, from the calculation, that the two-sided p-value is twice as big as the one-sided p-value. Often, two-sided p-values are preferred as a way of avoiding making false significance claims.
 
 # Summary of gender discrimination
+
+## Significance
+Only 30 of the 1000 permuted differences were larger than or equal to the observed statistic. That is, we would have observed data like ours only 3% of the time if men and women were equally likely to be promoted. Pay special attention to how the p-value is computed here. First we identify permuted differences that are larger than or equal to the observed statistic and label those situations with a 1, all other permutations receiving a zero. By averaging the 0s and 1s, the mean gives the proportion of times the permuted difference is larger than or equal to the observed difference. Because (point) 03 is less than (point) 05, we reject the null hypothesis and claim that men are promoted at a higher rate than women. That is, we conclude that it was not simply random variability which led to a higher proportion of men being promoted. A p-value of (point) 03 is reasonably close to (point) 05 which means we should be somewhat careful in making strong claims. We should take the results as a indication that more work should be done on the claims. Indeed, in 40 years since this research was published, many social scientists have been able to replicate research on gender discrimination in the workforce.
+
+## Causation
+Because the study was randomized, that is, they randomly assigned the resumes to the managers, there is nothing systematically different about the two groups except the name on the resume. As an example, it wouldn't make sense to have given the female resumes to the first 24 managers who arrived at the training. Those early arriving individuals might be less inclined to promote anyone given their strict adherence to being on time. The only difference in the two groups, both the participants as well as the resumes, was the name on the top of the resume. Therefore, any difference in promotion rates is due to the gender of the applicant. That is, we can infer a causal connection between the gender of the applicant being male and a higher promotion rate.
+
+## Random sample
+The 35 individuals in the sample were not randomly sampled from all possible American bank managers; they were at a management training session. In order to generalize the results of the study to a larger population, we would need more information about the study and careful thinking about who the study participants might represent.
+
+
+
+
+
