@@ -1,0 +1,186 @@
+---
+title: "Confidence intervals"
+output: html_notebook
+---
+
+
+```{r}
+# Load packages
+library(ggplot2)
+library(tidyverse)
+library(infer)
+
+all_polls <- readRDS("./datasets/all_polls.rds")
+```
+
+
+
+```{r}
+all_polls
+```
+
+
+
+# Parameters and confidence intervals
+
+
+## What is the parameter ? 
+In November 2016, the voters elected a new president of the United States. Prior to the election, thousands of polls were taken to gauge the popularity of each of the candidates. Leaving aside the idea that popular opinion changes over time, a poll can be thought of as a sample of individuals measured so as to estimate the proportion of all voters who will vote for each candiate (i.e. the population parameter).
+
+Consider an election in your home town that will take place in a week's time. You poll a randomly selected subset of the voters in your town and ask them if they plan to vote for Candidate X or Candidate Y. In this chapter, we will focus on sampling variability—the variability in sample proportions due to polling different randomly selected individuals from the population.
+
+Before investigating the sampling variability, what is the population parameter of interest?
+
+- The proportion of all voters in your town who will vote for Candidate X on election day.
+
+
+## Hypthesis test or confidence interval
+
+A university is trying to determine whether parking is a problem on its campus. The student newspaper contacts a random sample of 200 students and asks whether or not they are frustrated with the parking situation. They want to estimate the proportion of students at the college who are frustrated with the parking situation.
+
+In this setting, which is more appropriate, a hypothesis test or a confidence interval?
+
+- Confidence interval because the goal is to estimate a population parameter.
+
+# Bootstrapping
+
+How do samples from the null population vary ?
+
+- __statistic__, proportion of successes in sample -> $\hat p$
+- __parameter__, proportion of successes in population -> p
+
+ 
+In **Confidence Intervals**
+
+- there is no __null population__, unlike in hypothesis testing
+
+
+## Resampling from a sample
+
+To investigate how much the estimates of a population proportion change from sample to sample, you will set up two sampling experiments.
+
+In the first experiment, you will simulate repeated samples from a population. In the second, you will choose a single sample from the first experiment and repeatedly resample from that sample: a method called bootstrapping. More specifically:
+
+Experiment 1: Assume the true proportion of people who will vote for Candidate X is 0.6. Repeatedly sample 30 people from the population and measure the variability of $\hat p$ (the sample proportion).
+
+Experiment 2: Take one sample of size 30 from the same population. Repeatedly sample 30 people (with replacement!) from the original sample and measure the variability of $\hat p^*$ (the resample proportion).
+
+It's important to realize that the first experiment relies on knowing the population and is typically impossible in practice. The second relies only on the sample of data and is therefore easy to implement for any statistic. Fortunately, as you will see, the variability in, or the proportion of "successes" in a sample, is approximately the same whether we sample from the population or resample from a sample.
+
+
+### Experiment 1
+
+```{r}
+# Compute p-hat for each poll
+ex1_props <- all_polls %>% 
+  # Group by poll
+  group_by(poll) %>% 
+  # Calculate proportion of yes votes
+  summarize(stat = mean(vote == "yes"))
+  
+# Review the result
+ex1_props
+```
+
+```{r}
+# Select one poll from which to resample
+one_poll <- all_polls %>%
+  # Filter for the first poll
+  filter(poll == 1) %>%
+  # Select vote
+  select(vote)
+one_poll
+```
+
+
+### Experiment 2
+
+```{r}
+# Compute p-hat* for each resampled poll
+ex2_props <- one_poll %>%
+  # Specify vote as the response, where yes means success
+  specify(response = vote, success = "yes") %>%
+  # Generate 1000 reps of type bootstrap
+  generate(reps = 1000, type = "bootstrap") %>% 
+  # Calculate the summary stat "prop"
+  calculate(stat = "prop")
+
+ex2_props
+```
+
+
+Calculate variability of both samples
+
+```{r}
+ex1_props %>% 
+  summarize(variability = sd(stat))
+  
+ex2_props %>% 
+  summarize(variability = sd(stat))
+```
+The variability in the proportion of “successes” in a sample is approximately the same whether we sample from the population or resample from a sample.
+
+
+## Visualizing the variability of p-hat
+
+In order to compare the variability of the sampled 
+ $\hat p$ and  $\hat p^*$ values in the previous exercises, it is valuable to visualize their distributions. To recall, the exercises walked through two different experiments for investigating the variability of 
+ $\hat p$ and  $\hat p^*$ :
+ 
+- Experiment 1: Sample (n=30) repeatedly from an extremely large population (gold standard, but unrealistic)
+
+- Experiment 2: Resample (n=30) repeatedly with replacement from a single sample of size 30
+ 
+```{r}
+# Combine data from both experiments
+both_ex_props <- bind_rows(ex1_props, ex2_props, .id = "experiment")
+
+# Using both_ex_props, plot stat colored by experiment
+ggplot(both_ex_props, aes(stat, color = experiment)) + 
+  # Add a density layer with bandwidth 0.1
+  geom_density(bw = 0.1)
+```
+
+Note that the curves are quite similar in shape. The sampled 
+ values are centered around the true (typically unknown parameter) parameter (red); the resampled 
+ values are centered around the estimate from the very first poll (green). Great work!
+
+
+## Always resample the original number of observations
+
+In the bootstrap examples, exactly 30 observations have been repeatedly resampled from the original sample. The choice of 30 was given because the original sample had 30 observations. If we had resampled 3 observations instead, the resampled $\hat p^*$
+ value could have ranged from 0 to 1 (producing a much larger $SE(\hat p^*)$
+ than desired). If we had resampled 300 observations instead, the resampled $\hat p^*$ 
+ value would have been close to the same number each time (producing a much smaller $SE(\hat p^*)$
+ than desired).
+
+Generally, if $n$ represents the size of the original sample, how many observations should we resample with replacement when bootstrapping?
+
+
+- Resample exactly $n$ observations because then the variability of $\hat p^*$
+ will be most similar / representative of the original sampling process.
+
+ Resamples with replacement are an excellent model for the process of taking the original sample from the population. Remember, in research problems, you don't have an ability to take more than one original sample, but you can take as many resamples as you like.
+
+# Variability in p-hat
+
+
+## Empirical Rule
+
+
+## Bootstrap t-confidence interval
+
+
+# Interpreting CIs and  technical conditions
+
+
+## Sample size effects on bootstrap CIs
+
+
+## Sample proportion value effects on bootstrap CIs
+
+
+## Percentile effects on bootstrap CIs
+
+
+# Summary of statistical inference
