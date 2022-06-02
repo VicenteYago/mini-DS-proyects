@@ -1,5 +1,5 @@
 ---
-title: "Introduction to ideas of Inference"
+title: "I - Introduction to ideas of Inference"
 output: html_notebook
 ---
 
