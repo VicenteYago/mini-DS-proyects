@@ -230,12 +230,75 @@ diff_med_ci %>%
 ```
 
 
-
 # Comparing means with a t-test
 
 ## Hourly pay vs. citizenship status
 
+Using the acs12 data, and specifically the variables income, hrs_work, and citizen, summarize, visualize, and compare the distributions of hourly pay rate for citizens and non-citizens.
+
+```{r}
+acs12 %<>% 
+  mutate(hrly_pay= income / (hrs_work * 52))
+
+acs12$hrly_pay
+```
+
+
+```{r}
+acs12_complete_hrlypay_citizen <- acs12 %>%
+  filter(!is.na(hrly_pay), !is.na(citizen))
+
+acs12_complete_hrlypay_citizen
+```
+
+```{r}
+# Get number of rows in full dataset
+n_all <- nrow(acs12)
+
+# Get number of rows in filtered dataset
+n_non_missing <- nrow(acs12_complete_hrlypay_citizen)
+
+# Calculate number missing
+n_missing <- n_all - n_non_missing
+
+# Calculate proportion missing
+prop_missing <- n_missing / n_all
+
+# See the result
+prop_missing
+```
+```{r}
+acs12_complete_hrlypay_citizen %>%
+  group_by(citizen) %>%
+  summarize(
+    x_bar = mean(hrly_pay),
+    s = sd(hrly_pay),
+    n = n()
+  )
+```
+
+```{r}
+ggplot(acs12_complete_hrlypay_citizen, aes(x = hrly_pay)) +
+  geom_histogram(binwidth = 5) +
+  facet_grid(rows = vars(citizen))
+```
+
+
+
 ## Estimating the difference of two means using a t-interval
+
+Earlier we used summary statistics and a visualization to compare the hourly pay of citizens vs. non-citizens. In this exercise we estimate the difference between the average hourly pay between these two groups.
+
+The acs12_complete_hrlypay_citizen is already loaded for you.
+
+```{r}
+# Construct 95% CI using a t-test
+test_results <- t.test(hrly_pay ~ citizen, data = acs12_complete_hrlypay_citizen)
+
+# See the results
+test_results
+```
+We can not reyect the null hypothesis.
 
 
 
