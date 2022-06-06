@@ -239,8 +239,6 @@ Using the acs12 data, and specifically the variables income, hrs_work, and citiz
 ```{r}
 acs12 %<>% 
   mutate(hrly_pay= income / (hrs_work * 52))
-
-acs12$hrly_pay
 ```
 
 
