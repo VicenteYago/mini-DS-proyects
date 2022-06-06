@@ -1,0 +1,242 @@
+---
+title: "3 - Inferenced for difference in two parameters"
+output: html_notebook
+---
+
+
+
+In this chapter you'll extend what you have learned so far to use both simulation and CLT based techniques for inference on the difference between two parameters from two independent numerical distributions.
+
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(ggplot2)
+library(infer)
+library(openintro)
+```
+
+```{r}
+stem_cell
+```
+
+
+# Hypothesis testing for comparing two means
+
+So far in this course, we discussed inference on a single mean as well as inference for comparing two means. Next we move on to comparing many means simultaneously.
+
+
+## Evaluating the effectiveness of steam cell treatment
+
+Now that we set out hypotheses, we can calculate the observed difference in means between the treatment and control groups. The stem.cell data frame gives us the pumping capacity of the heart before and after the experiment. So first we need to find the difference between these for each experimental unit, and then use these change values to calculate the observed difference in mean change between treatment and control groups.
+
+
+```{r}
+stem_cell %<>%
+  mutate(change = after - before)
+
+stem_cell
+```
+
+```{r}
+diff_mean <- stem_cell %>%
+  group_by(trmt) %>%
+  summarize(mean_change = mean(change)) %>% 
+  pull %>%
+  diff
+  
+diff_mean
+```
+
+## Evaluating the effectiveness of steam cell treatment (cont.)
+
+```{r}
+n_replicates <- 1000
+
+diff_mean_ht <- stem_cell %>%
+  specify(change ~ trmt) %>% 
+  hypothesize(null = "independence") %>% 
+  generate(reps = n_replicates, type = "permute") %>% 
+  calculate(stat = "diff in means", order = c("esc", "ctrl"))
+
+diff_mean_ht
+```
+
+
+```{r}
+ggplot(diff_mean_ht, aes(x = stat)) + 
+  geom_histogram() +
+  ggtitle("Null Dist")
+```
+```{r}
+diff_mean_ht %>%
+  filter(stat > diff_mean) %>%
+  # Calculate p-value
+  summarize(p_val = n()/n_replicates)
+```
+
+```{r}
+diff_mean_ht %>% 
+  visualise() + 
+  shade_p_value(obs_stat = diff_mean, direction = "greater")
+```
+```{r}
+diff_mean_ht %>% 
+  get_p_value(obs_stat = diff_mean, direction = "greater")
+```
+
+## Conclusion of the hypothesis test
+
+- The data provide convincing evidence of a difference
+
+
+
+## Evaluating the relationship between smoking during pregnancy and birth weight
+
+The state of North Carolina released to the public a large data set containing information on births recorded in this state. This data set has been of interest to medical researchers who are studying the relation between habits and practices of expectant mothers and the birth of their children. ncbirths is a random sample of 1000 cases from this data set. We want to evaluate whether there is a difference between weights of babies born to smoker and non-smoker mothers.
+
+```{r}
+(ncbirths_complete_habit <- ncbirths %>% filter(!is.na(habit)))
+```
+
+
+```{r}
+# Calculate observed difference in means
+
+diff_mean_obs <- ncbirths_complete_habit %>%
+  group_by(habit) %>%
+  summarize(mean_weight = mean(weight)) %>%
+  pull %>%
+  diff 
+
+diff_mean_obs
+```
+```{r}
+n_replicates <- 1000
+
+# Generate 1000 differences in means via randomization
+diff_mean_ht <- ncbirths_complete_habit %>% 
+  # Specify weight vs. habit
+  specify(weight ~ habit) %>% 
+  # Null = no difference between means
+  hypothesize("independence") %>% 
+  # Shuffle labels 1000 times
+  generate(reps = n_replicates, type = "permute") %>%
+  # Calculate test statistic, nonsmoker then smoker
+  calculate("diff in means", order = c("nonsmoker", "smoker"))
+
+diff_mean_ht
+```
+
+
+```{r}
+# Calculate p-value
+diff_mean_ht %>%
+  # Identify simulated test statistics at least as extreme as observed
+  filter(stat < diff_mean_obs) %>%
+  # Calculate p-value
+  summarize(
+    one_sided_p_val = n()/n_replicates,
+    two_sided_p_val = 2*one_sided_p_val
+  )
+```
+
+```{r}
+diff_mean_ht %>% 
+  visualise() +
+  shade_p_value(obs_stat = diff_mean_obs, direction = "two sided")
+```
+
+```{r}
+diff_mean_ht %>% 
+  get_p_value(obs_stat = diff_mean_obs, direction = "two sided")
+```
+
+
+
+# Bootstrap CI for difference in two means
+
+## Quantifing the relationship between smoking during pregnancy and birth weight
+
+Let's construct a bootstrap interval for the difference in mean weights of babies born to smoker and non-smoker mothers. The ncbirths_complete_habit data frame you created earlier is available to use.
+
+
+```{r}
+# Generate 1500 bootstrap difference in means
+diff_mean_ci <- ncbirths_complete_habit %>%
+  # Specify weight vs. habit
+  specify(weight ~ habit) %>%
+  # Generate 1500 bootstrap replicates
+  generate(reps = 1500, type = "bootstrap" ) %>%
+  # Calculate the difference in means, nonsmoker then smoker
+  calculate(stat = "diff in means", order = c("nonsmoker", "smoker"))
+
+diff_mean_ci
+```
+
+```{r}
+# Calculate the 95% CI via percentile method
+diff_mean_ci %>%
+  summarize(
+    l = quantile(stat, 0.025),
+    u = quantile(stat, 0.975)
+  )
+```
+```{r}
+ci <- diff_mean_ci %>% 
+          get_confidence_interval(level = .95,
+                                  type = "percentile")  
+  
+diff_mean_ci %>% 
+  visualize() + 
+  shade_confidence_interval(ci)
+```
+
+## Median lenghts of pregnancies for smoking and non-smoking mothers
+
+Let's turn our attention to another variable, weeks, indicating the length of the pregnancy. Construct a bootstrap interval for the difference in median lengths of pregnancies of smoker and non-smoker mothers.
+
+```{r}
+ncbirths_complete_habit_weeks <- ncbirths %>%
+  filter(!is.na(habit)) %>% 
+  filter(!is.na(weeks))
+```
+
+```{r}
+# Generate 1500 bootstrap difference in medians
+diff_med_ci <- ncbirths_complete_habit_weeks %>%
+  specify(weeks ~ habit) %>%
+  generate(reps = 1500, type = "bootstrap") %>%
+  calculate(stat = "diff in medians", order = c("nonsmoker", "smoker"))
+```
+
+
+```{r}
+diff_med_ci %>%
+  summarize(
+    l = quantile(stat, 0.04),
+    u = quantile(stat, 0.96)
+  )
+```
+
+```{r}
+ci <- diff_med_ci %>% 
+          get_confidence_interval(level = .92,
+                                  type = "percentile")  
+  
+diff_med_ci %>% 
+  visualize() + 
+  shade_confidence_interval(ci)
+```
+
+
+
+# Comparing means with a t-test
+
+## Hourly pay vs. citizenship status
+
+## Estimating the difference of two means using a t-interval
+
+
+
+
