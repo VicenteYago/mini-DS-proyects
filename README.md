@@ -1,6 +1,6 @@
 # mini-DS-proyects
 
-Just mini projects to learn and sharpen my skills.
+Just mini projects/courses to learn and sharpen my skills, mainly jupyter and RStudio notebooks.
 
 * **Dr. Semmelweis and the Discovery of Handwashing**: pandas, bootstrap sampling.
  
