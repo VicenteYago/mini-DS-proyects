@@ -6,7 +6,7 @@ Just mini projects/courses to learn and sharpen my skills, mainly jupyter and RS
  
 * **Exploring the Evolution of Linux**: pandas, time series
 
-* **microsoft_ml_basics**: basic EDA, regression, classification, clustering for toy datasets suited for Azure DP-100 cert.
+* **microsoft_ml_basics**: basic EDA, regression, classification, clustering and DL for toy datasets suited for Azure DP-100 cert.
 
 * **Foundations of inference**:  hypothesis testing, p-values, confidence intervals in R (infer package)
 
