@@ -13,4 +13,4 @@ Just mini projects/courses to learn and sharpen my skills, mainly jupyter and RS
 * **Inference for Numerical Data**: Bootstraping, t-tests, ANOVA in R (infer)
 
 * **parallel-proc-dask**: Parallel (thread and process level) training with Dask in Python.
-* **Introduction to Natural Language Processing** : Bag of Words, NLTK, spacy
+* **Introduction to Natural Language Processing** : Bag of Words, Named-Entity Recognition: NLTK, spacy, gensim
